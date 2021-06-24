@@ -4,18 +4,18 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 set(PROJECT_NAME TokenizerTest)
 PROJECT(${PROJECT_NAME}) 
 # 设置编译器选项：O3优化，显示所有警告
-SET(CMAKE_C_FLAGS "$ENV{CFLAGS} -O3 -Wall") 
+# SET(CMAKE_C_FLAGS "$ENV{CFLAGS} -O3 -Wall") 
 # 定义头文件的路径变量
-SET(INCLUDE_PATH /usr/local/include/) 
+SET(INCLUDE_PATH ${PROJECT_SOURCE_DIR}/include)
 MESSAGE(STATUS "Include Path, ${INCLUDE_PATH}")
 # 定义源文件路径变量
-SET(SOURCE_PATH ${PROJECT_SOURCE_DIR}) 
+SET(SOURCE_PATH ${PROJECT_SOURCE_DIR}/src) 
 MESSAGE(STATUS "Source Path , ${SOURCE_PATH}") 
 # 包含头文件路径
 INCLUDE_DIRECTORIES(${INCLUDE_PATH})
 
 # 添加源文件路径下所有源文件存放到变量中(*.c && *.cpp)，当然也可以手动一个个文件添加进来
-AUX_SOURCE_DIRECTORY(${SOURCE_PATH}/src SRC_LIST) 
+AUX_SOURCE_DIRECTORY(${SOURCE_PATH} SRC_LIST) 
 
 # 设置动态库输出路径
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib) 
@@ -24,7 +24,7 @@ MESSAGE(STATUS "Library Output Path, " ${PROJECT_BINARY_DIR/lib})
 ADD_LIBRARY(tokenizer SHARED ${SRC_LIST}) 
 
 # 添加源文件列表变量
-SET(SRC_LIST ${PROJECT_SOURCE_DIR}/src/tokenizer.cpp)
+# SET(SRC_LIST ${PROJECT_SOURCE_DIR}/src/tokenizer.cpp)
 # 打印编译目录和项目目录路径
 MESSAGE(STATUS "This is BINARY dir " ${PROJECT_BINARY_DIR})
 MESSAGE(STATUS "This is SOURCE dir " ${PROJECT_SOURCE_DIR})
