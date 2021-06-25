@@ -82,8 +82,8 @@ class BertTokenizer {
       const string& vocab_file,
       bool do_lower_case = true,
       const wstring& unk_token = L"[UNK]",
-      const wstring& pad_token = L"[UNK]",
-      const wstring& cls_token = L"[UNK]",
+      const wstring& pad_token = L"[PAD]",
+      const wstring& cls_token = L"[CLS]",
       const wstring& mask_token = L"[MASK]",
       const wstring& sep_token = L"[SEP]",
       const string& padding_site = "right");

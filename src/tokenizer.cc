@@ -12,7 +12,6 @@
 #include <utf8proc.h>
 
 #include <algorithm>
-#include <locale>
 #include <codecvt>
 #include <iostream>
 #include <fstream>
@@ -116,59 +115,14 @@ vector<wstring> WhiteSpaceTokenize(const wstring& text) {
   return Split(text);
 }
 
-wstring ConvertToUnicode(const string& text) {
-  size_t i = 0;
-  wstring ret;
-  while (i < text.size()) {
-    wchar_t codepoint;
-    utf8proc_ssize_t forward = utf8proc_iterate(
-      reinterpret_cast<const utf8proc_uint8_t *>(&text[i]),
-      text.size() - i,
-      reinterpret_cast<utf8proc_int32_t *>(&codepoint));
-    if (forward < 0) return L"";
-    ret += codepoint;
-    i += forward;
-  }
-  return ret;
-}
-
-wstring ConvertUtf8ToWstr(const string& src) {
+wstring ConvertStrToWstr(const string& src) {
   wstring_convert<codecvt_utf8<wchar_t>> converter;
   return converter.from_bytes(src);
 }
 
-string ConvertWstrToUtf8(const wstring& src) {
+string ConvertWstrToStr(const wstring& src) {
   wstring_convert<codecvt_utf8<wchar_t>> converter;
   return converter.to_bytes(src);
-}
-
-
-static std::wstring convertToUnicode(const std::string& text) {
-    size_t i = 0;
-    std::wstring ret;
-    while (i < text.size()) {
-        wchar_t codepoint;
-        utf8proc_ssize_t forward = utf8proc_iterate(
-          reinterpret_cast<const utf8proc_uint8_t *>(&text[i]),
-          text.size() - i,
-          reinterpret_cast<utf8proc_int32_t *>(&codepoint));
-        if (forward < 0) return L"";
-        ret += codepoint;
-        i += forward;
-    }
-    return ret;
-}
-
-string ConvertFromUnicode(const wstring& text) {
-  char dst[64];
-  string ret;
-  for (auto ch : text) {
-    utf8proc_ssize_t num = utf8proc_encode_char(
-      ch, reinterpret_cast<utf8proc_uint8_t*>(dst));
-    if (num <= 0) return "";
-    ret += string(dst, dst + num);
-  }
-  return ret;
 }
 
 wstring ToLower(const wstring& s) {
@@ -190,7 +144,7 @@ shared_ptr<Vocab> LoadVocab(const string& vocab_file) {
   string line;
   size_t index = 0;
   while (getline(ifs, line)) {
-    wstring token = ConvertToUnicode(line);
+    wstring token = ConvertStrToWstr(line);
     // The input line cann't be converted to unicode.
     // The drop it.
     if (token.empty()) continue;
@@ -211,9 +165,9 @@ wstring BasicTokenizer::clean_text(const wstring& text) const {
   for (const wchar_t& cp : text) {
     if (cp == 0 || cp == 0xfffd || IsControl(cp)) continue;
     if (IsWhiteSpace(cp))
-      output += L" ";
+      output.push_back(L' ');
     else
-      output += cp;
+      output.push_back(cp);
   }
   return output;
 }
@@ -247,7 +201,7 @@ wstring BasicTokenizer::run_strip_accents(
   // Strips accents from a piece of text.
   wstring unicode_text;
   try {
-    unicode_text = ConvertToUnicode(NormalizeNfd(ConvertFromUnicode(text)));
+    unicode_text = ConvertStrToWstr(NormalizeNfd(ConvertWstrToStr(text)));
   }
   catch (bad_cast& e) {
     cerr << e.what() << endl;
@@ -285,9 +239,7 @@ vector<wstring> BasicTokenizer::run_split_on_punc(
 
 vector<wstring> BasicTokenizer::Tokenize(
   const string& text) const {
-  cout << "BasicTokenizer::Tokenize " << text <<" ";
-  wstring unicode_text = ConvertToUnicode(text);
-  wcout << L"ConvertToUnicode " << unicode_text << endl;
+  wstring unicode_text = ConvertStrToWstr(text);
   unicode_text = clean_text(unicode_text);
 
   unicode_text = tokenize_chinese_chars(unicode_text);
@@ -444,7 +396,7 @@ vector<wstring> BertTokenizer::ConvertIdsToTokens(
 
 string BertTokenizer::ConvertTokensToString(
   const vector<wstring>& tokens) const {
-    string text = ConvertFromUnicode(boost::join(tokens, L" "));
+    string text = ConvertWstrToStr(boost::join(tokens, L" "));
     return text;
   }
 
@@ -462,7 +414,7 @@ vector<size_t> BertTokenizer::BuildInputsWithSpecialTokens(
   const vector<size_t>& token_ids_0,
   const vector<size_t>& token_ids_1) const {
     if (token_ids_1.size() == 0) {
-      vector<size_t> inputs(2+token_ids_0.size());
+      vector<size_t> inputs;
       inputs.push_back(cls_token_id_);
       for (auto& token_id : token_ids_0) {
         inputs.push_back(token_id);
@@ -470,7 +422,7 @@ vector<size_t> BertTokenizer::BuildInputsWithSpecialTokens(
       inputs.push_back(sep_token_id_);
       return inputs;
     } else {
-      vector<size_t> inputs(3+token_ids_0.size()+token_ids_1.size());
+      vector<size_t> inputs;
       inputs.push_back(cls_token_id_);
       for (auto& token_id : token_ids_0) {
         inputs.push_back(token_id);
@@ -500,11 +452,8 @@ vector<size_t> BertTokenizer::CreateTokenTypeIdsFromSequences(
       return token_type_ids;
     } else {
       vector<size_t> token_type_ids(
-        token_ids_0.size()+ token_ids_1.size()+3);
-      for (size_t i = 0; i <= token_ids_0.size(); i++) {
-        token_type_ids[i] = 0;
-      }
-      for (size_t i = token_ids_0.size()+1 ; i <= token_type_ids.size(); i++) {
+        token_ids_0.size()+ token_ids_1.size()+3, 0);
+      for (size_t i = token_ids_0.size() + 2 ; i < token_type_ids.size(); i++) {
         token_type_ids[i] = 1;
       }
       return token_type_ids;
@@ -613,11 +562,11 @@ vector<size_t> BertTokenizer::GetSpecialTokensMask(
           "You should not supply a second sequence if the provided sequence of "
           "ids is already formatted with special tokens for the model.");
       }
-      vector<size_t> res = vector<size_t>(token_ids_0.size());
+      vector<size_t> res(token_ids_0.size());
       for (size_t i = 0; i < res.size(); i++) {
         auto&& iter = find(all_special_token_ids_.begin(),
-                          all_special_token_ids_.end(),
-                          token_ids_0[i]);
+                        all_special_token_ids_.end(),
+                        token_ids_0[i]);
         if (iter != all_special_token_ids_.end()) {
           res[i] = 1;
         } else {
@@ -644,11 +593,6 @@ vector<size_t> BertTokenizer::GetSpecialTokensMask(
 
 vector<size_t> BertTokenizer::get_input_ids(const string& text) const {
   vector<wstring> tokens = Tokenize(text);
-  cout<< "text: "<< text << endl;
-  for (auto v : tokens) {
-    wcout << v << " ";
-  }
-  wcout << endl;
   vector<size_t> token_ids = ConvertTokensToIds(tokens);
   return token_ids;
 }
@@ -665,15 +609,11 @@ unordered_map<string, vector<size_t>> BertTokenizer::Encode(
   const string&  truncation_strategy /* = "longest_first" */,
   bool return_overflowing_tokens /* = false */,
   bool return_special_tokens_mask /* = false */) const {
-    cout << "check ids"<< endl;
     vector<size_t> ids = get_input_ids(text);
-    vector<size_t> pair_ids = vector<size_t>();
+    vector<size_t> pair_ids;
     if (text_pair != "") {
       vector<size_t> res = get_input_ids(text_pair);
-      pair_ids.resize(res.size());
-      for (size_t i = 0; i < res.size(); i++) {
-        pair_ids[i] = res[i];
-      }
+      pair_ids.swap(res);
     }
 
     bool pair = false;
@@ -722,10 +662,6 @@ unordered_map<string, vector<size_t>> BertTokenizer::Encode(
     // Check lengths
     if (max_seq_len > 0 &&
     encoded_inputs["input_ids"].size() > max_seq_len ) {
-      cout<< "check check check "
-        << max_seq_len
-        << " " << encoded_inputs["input_ids"].size()
-        << endl;
       throw runtime_error(
         "There is something wrong with the input sequence length."
         " Please check it.");
@@ -808,13 +744,12 @@ unordered_map<string, vector<size_t>> BertTokenizer::Encode(
     }
 
     if (return_position_ids) {
-      encoded_inputs["position_ids"] = vector<size_t>(
-        encoded_inputs["input_ids"].size());
+      vector<size_t> position_ids(encoded_inputs["input_ids"].size(), 0);
       for (size_t i = 0; i < encoded_inputs["input_ids"].size() ; i++) {
-        encoded_inputs["position_ids"][i] = i;
+        position_ids[i] = i;
       }
+      encoded_inputs["position_ids"] = position_ids;
     }
-
     return encoded_inputs;
   }
 
@@ -840,27 +775,12 @@ int main() {
 
   string line;
   while (getline(cin, line)) {
-    cout << "input " << line << endl;
-    wstring t = ConvertUtf8ToWstr(line);
-    wcout << L"ConvertUtf8ToWstr " << t << endl << endl;
-    cout << "ConvertWstrToUtf8 " << ConvertWstrToUtf8(t) << endl;
-
+    cout << "input " << line << " " << line.size() << endl;
     vector<wstring> tokens = full_t_ptr->Tokenize(line);
     vector<size_t> ids = full_t_ptr->ConvertTokensToIds(tokens);
-    cout << "123 "<< line << endl;
-
-    wcout << boost::join(tokens, L" ");
-    cout << ConvertFromUnicode(boost::join(tokens, L" "))
-      << "#"
-      << "\t";
-    for (size_t i = 0; i < ids.size(); i++) {
-      if (i != 0) cout << " ";
-      cout << ids[i];
-    }
-    cout << endl;
 
     unordered_map<string, vector<size_t>> res = tokenizer_ptr->Encode(
-      line, "", 10, false, false, true, false);
+      line, "", 5, false, false, true, false);
     for (auto i : res) {
       cout << i.first << ":" <<endl;
       for (auto j : i.second) {
@@ -870,7 +790,7 @@ int main() {
     }
 
     unordered_map<string, vector<size_t>> res_2 = tokenizer_ptr->Encode(
-      line, "这是个测试样例", 30, false, false, true, false);
+      line, "这是个测试样例", 30, true, true, true, true);
     for (auto i : res_2) {
       cout << i.first << ":" << endl;
       for (auto j : i.second) {
