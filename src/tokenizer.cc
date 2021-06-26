@@ -13,16 +13,18 @@
 
 #include <algorithm>
 #include <codecvt>
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <numeric>
+#include <set>
 #include <string>
 #include <vector>
 #include <unordered_map>
 
 #include <boost/algorithm/string.hpp>
 
-#include "include/tokenizer.h"
+#include "paddlenlp/tokenizer.h"
 
 
 using std::bad_cast;
@@ -154,6 +156,30 @@ shared_ptr<Vocab> LoadVocab(const string& vocab_file) {
   }
   ifs.close();
   return vocab;
+}
+
+
+int LoadVocab(const string& vocab_file, shared_ptr<Vocab> vocab) {
+  ifstream ifs(vocab_file, ifstream::in);
+  if (!ifs) {
+    throw runtime_error(
+      "Open the vocab file failly, please check the file " + vocab_file + ".");
+    return 0;
+  } else {
+    string line;
+    size_t index = 0;
+    while (getline(ifs, line)) {
+      wstring token = ConvertStrToWstr(line);
+      // The input line cann't be converted to unicode.
+      // The drop it.
+      if (token.empty()) continue;
+      token = Strip(token);
+      (*vocab)[token] = index;
+      index++;
+    }
+    ifs.close();
+    return 1;
+  }
 }
 
 
@@ -359,7 +385,7 @@ BertTokenizer::BertTokenizer(
 
     all_special_tokens_ = vector<wstring>(
       {unk_token_, pad_token_, cls_token_, mask_token_, sep_token_});
-    all_special_token_ids_ = vector<size_t>(
+    all_special_token_ids_ = std::set<size_t>(
       {unk_token_id_,
       pad_token_id_,
       cls_token_id_,
@@ -551,6 +577,99 @@ unordered_map<string, vector<size_t>> BertTokenizer::TruncateSequence(
     res["overflowing_token_ids"] = overflowing_token_ids;
     return res;
   }
+
+
+void BertTokenizer::TruncateSequence(
+  unordered_map<string, vector<size_t>>* res,
+  vector<size_t>* ids,
+  vector<size_t>* pair_ids,
+  const int num_tokens_to_remove /* = 0 */,
+  const string&  truncation_strategy /* = "longest_first" */,
+  const size_t stride /* = 0 */) const {
+    vector<size_t> overflowing_token_ids = vector<size_t>();
+    if (num_tokens_to_remove <= 0) {
+      (*res)["ids"] = *ids;
+      (*res)["pair_ids"] = *pair_ids;
+      (*res)["overflowing_token_ids"] = overflowing_token_ids;
+      return;
+    }
+
+    size_t window_len;
+    if (truncation_strategy == "longest_first") {
+      for (size_t i =0; i < num_tokens_to_remove; i++) {
+        if ((pair_ids->size() == 0) || (ids->size() > pair_ids->size())) {
+          if (overflowing_token_ids.size() == 0) {
+            window_len = min(ids->size(), stride + 1);
+          } else {
+            window_len = 1;
+          }
+
+          for (size_t i = ids->size()-1;
+            i > ids->size() - window_len - 1;
+            i--) {
+            overflowing_token_ids.push_back((*ids)[i]);
+          }
+          ids->pop_back();
+        } else {
+          if (overflowing_token_ids.size() == 0) {
+            window_len = min(pair_ids->size(), stride+1);
+          } else {
+            window_len = 1;
+          }
+          for (size_t i = pair_ids->size()-1;
+          i > pair_ids->size() - window_len - 1;
+          i--) {
+            overflowing_token_ids.push_back((*pair_ids)[i]);
+          }
+          pair_ids->pop_back();
+        }
+      }
+      reverse(overflowing_token_ids.begin(), overflowing_token_ids.end());
+    } else if (truncation_strategy == "only_first") {
+      if (ids->size() > num_tokens_to_remove) {
+        window_len = min(ids->size(), stride + num_tokens_to_remove);
+        for (size_t i = ids->size()-1; i > ids->size() - window_len - 1; i--) {
+          overflowing_token_ids.push_back((*ids)[i]);
+        }
+        for (size_t i = 0; i < num_tokens_to_remove; i++) {
+          ids->pop_back();
+        }
+      } else {
+        cerr << "We need to remove {num_tokens_to_remove} "
+          "to truncate the input but the first sequence has a length "
+          << ids->size()
+          << ". Please select another truncation strategy than "
+          << truncation_strategy
+          <<", for instance \'longest_first\' or \'only_second\'."
+          << endl;
+      }
+    } else if (
+      truncation_strategy == "only_second" && pair_ids->size()== 0) {
+        if (pair_ids->size() > num_tokens_to_remove) {
+          window_len = min(pair_ids->size(), stride + num_tokens_to_remove);
+          for (size_t i = pair_ids->size()-1;
+          i > pair_ids->size() - window_len - 1;
+          i--) {
+            overflowing_token_ids.push_back((*pair_ids)[i]);
+          }
+          for (size_t i = 0; i < num_tokens_to_remove; i++) {
+            pair_ids->pop_back();
+          }
+        } else {
+          cerr << "We need to remove " << num_tokens_to_remove
+            << " to truncate the input but the first sequence has a length "
+            << ids->size()
+            << ". Please select another truncation strategy than "
+            << truncation_strategy
+            << ", for instance \'longest_first\' or \'only_first\'."
+            << endl;
+        }
+      }
+    (*res)["ids"] = *ids;
+    (*res)["pair_ids"] = *pair_ids;
+    (*res)["overflowing_token_ids"] = overflowing_token_ids;
+  }
+
 
 vector<size_t> BertTokenizer::GetSpecialTokensMask(
   const vector<size_t>& token_ids_0,
@@ -754,6 +873,163 @@ unordered_map<string, vector<size_t>> BertTokenizer::Encode(
   }
 
 
+void BertTokenizer::Encode(
+  unordered_map<string, vector<size_t>>* output,
+  const string& text,
+  const string& text_pair /* = "" */,
+  const int max_seq_len /* = -1 */,
+  bool pad_to_max_seq_len /* = false */,
+  bool return_length /* = false */,
+  bool return_token_type_ids /* = true */,
+  bool return_position_ids /* = false */,
+  bool return_attention_mask /* = false */,
+  const string&  truncation_strategy /* = "longest_first" */,
+  bool return_overflowing_tokens /* = false */,
+  bool return_special_tokens_mask /* = false */) const {
+  vector<size_t> ids = get_input_ids(text);
+  vector<size_t> pair_ids;
+  if (text_pair != "") {
+    vector<size_t> res = get_input_ids(text_pair);
+    pair_ids.swap(res);
+  }
+
+  bool pair = false;
+  if (pair_ids.size() != 0) {
+    pair = true;
+  }
+
+  size_t len_ids = ids.size();
+  size_t len_pair_ids = pair_ids.size();
+
+  // Truncation: Handle max sequence length
+  // If max_seq_len <= 0, then do nothing and keep the real length.
+  // If max_seq_len > 0 and
+  // all the input sequence len is over the max_seq_len,
+  // then we truncate it.
+  size_t total_len = len_ids + len_pair_ids + GetNumSpecialTokensToAdd(pair);
+  if (max_seq_len > 0  && total_len > max_seq_len) {
+    unordered_map<string, vector<size_t>>* res;
+    TruncateSequence(
+      res, &ids, &pair_ids, total_len - max_seq_len, truncation_strategy);
+    if (res->find("overflowing_token_ids") != res->end()) {
+      (*output)["overflowing_token_ids"] = (*res)["overflowing_token_ids"];
+      (*output)["num_truncated_tokens"] = vector<size_t>(
+        1, total_len - max_seq_len);
+    }
+  }
+
+  // Add special tokens
+  auto&& sequence = BuildInputsWithSpecialTokens(ids, pair_ids);
+  auto&& token_type_ids = CreateTokenTypeIdsFromSequences(ids, pair_ids);
+
+  // Build output dictionnary
+  (*output)["input_ids"] = sequence;
+  if (return_token_type_ids) {
+    (*output)["token_type_ids"] = token_type_ids;
+  }
+  if (return_special_tokens_mask) {
+    (*output)["special_tokens_mask"] = GetSpecialTokensMask(
+      ids, pair_ids);
+  }
+  if (return_length) {
+    (*output)["seq_len"] = vector<size_t>(
+      1, (*output)["input_ids"].size());
+  }
+
+  // Check lengths
+  if (max_seq_len > 0 &&
+  (*output)["input_ids"].size() > max_seq_len ) {
+    throw runtime_error(
+      "There is something wrong with the input sequence length."
+      " Please check it.");
+  }
+
+  // Padding
+  bool needs_to_be_padded = false;
+  if (pad_to_max_seq_len && max_seq_len > 0
+    && ((*output)["input_ids"].size() < max_seq_len)) {
+      needs_to_be_padded = true;
+  }
+
+  if (needs_to_be_padded) {
+    size_t difference = max_seq_len - (*output)["input_ids"].size();
+    if (padding_site_ == "right") {
+      if (return_attention_mask) {
+        vector<size_t> attention_mask(max_seq_len, 0);
+        for (size_t i = 0; i < (*output)["input_ids"].size(); i++) {
+          attention_mask[i] = 1;
+        }
+        (*output)["attention_mask"] = attention_mask;
+      }
+
+      if (return_token_type_ids) {
+        (*output)["token_type_ids"].resize(max_seq_len);
+        for (size_t i =max_seq_len-1;
+        i > (max_seq_len - 1 - difference); i--) {
+          (*output)["token_type_ids"][i] = pad_token_id_;
+        }
+      }
+
+      if (return_special_tokens_mask) {
+        (*output)["special_tokens_mask"].resize(max_seq_len);
+        for (size_t i = max_seq_len-1;
+        i > (max_seq_len-1-difference); i--) {
+          (*output)["special_tokens_mask"][i] = 1;
+        }
+      }
+
+      (*output)["input_ids"].resize(max_seq_len);
+      for (size_t i = max_seq_len-1;
+      i> (max_seq_len-1-difference); i--) {
+        (*output)["input_ids"][i] = pad_token_id_;
+      }
+    } else if (padding_site_ == "left") {
+      if (return_attention_mask) {
+        vector<size_t> attention_mask = vector<size_t>(max_seq_len, 0);
+        for (size_t i = difference; i < max_seq_len; i++) {
+          attention_mask[i] = 1;
+        }
+      }
+
+      if (return_token_type_ids) {
+        vector<size_t> tmp(max_seq_len, pad_token_id_);
+        for (size_t i = difference; i< max_seq_len; i++) {
+          tmp[i] = (*output)["token_type_ids"][i-difference];
+        }
+        (*output)["token_type_ids"] = tmp;
+      }
+
+      if (return_special_tokens_mask) {
+        vector<size_t> tmp(max_seq_len, 1);
+        for (size_t i = difference; i < max_seq_len; i++) {
+          tmp[i] = (*output)["special_tokens_mask"][i-difference];
+        }
+        (*output)["special_tokens_mask"] = tmp;
+      }
+
+      vector<size_t> tmp(max_seq_len, pad_token_id_);
+      for (size_t i = difference; i < max_seq_len; i++) {
+        tmp[i] = (*output)["input_ids"][i-difference];
+      }
+      (*output)["input_ids"] = tmp;
+    }
+  } else {
+    if (return_attention_mask) {
+      (*output)["attention_mask"] = vector<size_t>(
+        (*output)["input_ids"].size(), 1);
+    }
+  }
+
+  if (return_position_ids) {
+    vector<size_t> position_ids((*output)["input_ids"].size(), 0);
+    for (size_t i = 0; i < (*output)["input_ids"].size() ; i++) {
+      position_ids[i] = i;
+    }
+    (*output)["position_ids"] = position_ids;
+  }
+}
+
+
 int main() {
   BertTokenizer* tokenizer_ptr = nullptr;
   FullTokenizer* full_t_ptr = nullptr;
@@ -773,32 +1049,23 @@ int main() {
     return -1;
   }
 
-  string line;
-  while (getline(cin, line)) {
-    cout << "input " << line << " " << line.size() << endl;
-    vector<wstring> tokens = full_t_ptr->Tokenize(line);
-    vector<size_t> ids = full_t_ptr->ConvertTokensToIds(tokens);
-
-    unordered_map<string, vector<size_t>> res = tokenizer_ptr->Encode(
-      line, "", 5, false, false, true, false);
-    for (auto i : res) {
-      cout << i.first << ":" <<endl;
-      for (auto j : i.second) {
-        cout << j << " ";
-      }
-      cout << endl;
-    }
-
-    unordered_map<string, vector<size_t>> res_2 = tokenizer_ptr->Encode(
-      line, "这是个测试样例", 30, true, true, true, true);
-    for (auto i : res_2) {
-      cout << i.first << ":" << endl;
-      for (auto j : i.second) {
-        cout << j << " ";
-      }
-      cout << endl;
-    }
+  string line = "泰晤士河水绿如蓝两岸的建筑物涂染着生机勃发的色彩，"
+    "阳光也绿意葱笼，为一个季节围起了温情的栅栏。只有圣保罗大教堂不"
+    "为任何季节所动，一如故我地穿一身灰色法衣，"
+    "傲岸地站在泰晤士河畔，守望着岁月，它沉郁的钟声，";
+  cout << "line " << line.size() << endl;
+  int idx = 0;
+  auto start = std::chrono::system_clock::now();
+  while (idx < 10000) {
+    tokenizer_ptr->Encode(line, "只让浪漫的水手和虔诚的拜谒者感动。");
+    idx++;
   }
-
+  auto end   = std::chrono::system_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
+    end - start);
+  cout << "cost time: " << double(duration.count()) *
+    std::chrono::microseconds::period::num /
+    std::chrono::microseconds::period::den
+    << " sec" << endl;
   return 0;
 }

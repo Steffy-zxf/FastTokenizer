@@ -9,11 +9,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef INCLUDE_TOKENIZER_H_
-#define INCLUDE_TOKENIZER_H_
+#ifndef PADDLENLP_TOKENIZER_H_
+#define PADDLENLP_TOKENIZER_H_
 
 #include <utf8proc.h>
 
+#include <set>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -107,6 +108,13 @@ class BertTokenizer {
       const int num_tokens_to_remove = 0,
       const string&  truncation_strategy = "longest_first",
       const size_t stride = 0) const;
+    void BertTokenizer::TruncateSequence(
+      unordered_map<string, vector<size_t>>* res,
+      vector<size_t>* ids,
+      vector<size_t>* pair_ids,
+      const int num_tokens_to_remove = 0,
+      const string&  truncation_strategy = "longest_first",
+      const size_t stride = 0) const;
     vector<size_t> GetSpecialTokensMask(
       const vector<size_t>& token_ids_0,
       const vector<size_t>& token_ids_1 = vector<size_t>(),
@@ -124,12 +132,26 @@ class BertTokenizer {
       const string&  truncation_strategy = "longest_first",
       bool return_overflowing_tokens = false,
       bool return_special_tokens_mask = false) const;
+  void BertTokenizer::Encode(
+    unordered_map<string, vector<size_t>>* output,
+    const string& text,
+    const string& text_pair = "",
+    const int max_seq_len = -1,
+    bool pad_to_max_seq_len = false,
+    bool return_length = false,
+    bool return_token_type_ids = true,
+    bool return_position_ids = false,
+    bool return_attention_mask = false,
+    const string&  truncation_strategy = "longest_first",
+    bool return_overflowing_tokens = false,
+    bool return_special_tokens_mask = false) const {
+
 
  private:
     vector<size_t> get_input_ids(
       const string& text) const;
     vector<wstring> all_special_tokens_;
-    vector<size_t> all_special_token_ids_;
+    std::set<size_t> all_special_token_ids_;
     string vocab_file_;
     shared_ptr<Vocab> vocab_;
     InvVocab inv_vocab_;
@@ -142,4 +164,4 @@ class BertTokenizer {
     string padding_site_{"right"};
 };
 
-#endif  // INCLUDE_TOKENIZER_H_
+#endif  // PADDLENLP_TOKENIZER_H_
