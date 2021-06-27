@@ -503,7 +503,7 @@ unordered_map<string, vector<size_t>> BertTokenizer::TruncateSequence(
 
     size_t window_len;
     if (truncation_strategy == "longest_first") {
-      for (size_t i =0; i < num_tokens_to_remove; i++) {
+      for (size_t i = 0; i < num_tokens_to_remove; i++) {
         if ((pair_ids->size() == 0) || (ids->size() > pair_ids->size())) {
           if (overflowing_token_ids.size() == 0) {
             window_len = min(ids->size(), stride + 1);
@@ -586,89 +586,89 @@ void BertTokenizer::TruncateSequence(
   const int num_tokens_to_remove /* = 0 */,
   const string&  truncation_strategy /* = "longest_first" */,
   const size_t stride /* = 0 */) const {
-    vector<size_t> overflowing_token_ids = vector<size_t>();
-    if (num_tokens_to_remove <= 0) {
-      (*res)["ids"] = *ids;
-      (*res)["pair_ids"] = *pair_ids;
-      (*res)["overflowing_token_ids"] = overflowing_token_ids;
-      return;
-    }
-
-    size_t window_len;
-    if (truncation_strategy == "longest_first") {
-      for (size_t i =0; i < num_tokens_to_remove; i++) {
-        if ((pair_ids->size() == 0) || (ids->size() > pair_ids->size())) {
-          if (overflowing_token_ids.size() == 0) {
-            window_len = min(ids->size(), stride + 1);
-          } else {
-            window_len = 1;
-          }
-
-          for (size_t i = ids->size()-1;
-            i > ids->size() - window_len - 1;
-            i--) {
-            overflowing_token_ids.push_back((*ids)[i]);
-          }
-          ids->pop_back();
-        } else {
-          if (overflowing_token_ids.size() == 0) {
-            window_len = min(pair_ids->size(), stride+1);
-          } else {
-            window_len = 1;
-          }
-          for (size_t i = pair_ids->size()-1;
-          i > pair_ids->size() - window_len - 1;
-          i--) {
-            overflowing_token_ids.push_back((*pair_ids)[i]);
-          }
-          pair_ids->pop_back();
-        }
-      }
-      reverse(overflowing_token_ids.begin(), overflowing_token_ids.end());
-    } else if (truncation_strategy == "only_first") {
-      if (ids->size() > num_tokens_to_remove) {
-        window_len = min(ids->size(), stride + num_tokens_to_remove);
-        for (size_t i = ids->size()-1; i > ids->size() - window_len - 1; i--) {
-          overflowing_token_ids.push_back((*ids)[i]);
-        }
-        for (size_t i = 0; i < num_tokens_to_remove; i++) {
-          ids->pop_back();
-        }
-      } else {
-        cerr << "We need to remove {num_tokens_to_remove} "
-          "to truncate the input but the first sequence has a length "
-          << ids->size()
-          << ". Please select another truncation strategy than "
-          << truncation_strategy
-          <<", for instance \'longest_first\' or \'only_second\'."
-          << endl;
-      }
-    } else if (
-      truncation_strategy == "only_second" && pair_ids->size()== 0) {
-        if (pair_ids->size() > num_tokens_to_remove) {
-          window_len = min(pair_ids->size(), stride + num_tokens_to_remove);
-          for (size_t i = pair_ids->size()-1;
-          i > pair_ids->size() - window_len - 1;
-          i--) {
-            overflowing_token_ids.push_back((*pair_ids)[i]);
-          }
-          for (size_t i = 0; i < num_tokens_to_remove; i++) {
-            pair_ids->pop_back();
-          }
-        } else {
-          cerr << "We need to remove " << num_tokens_to_remove
-            << " to truncate the input but the first sequence has a length "
-            << ids->size()
-            << ". Please select another truncation strategy than "
-            << truncation_strategy
-            << ", for instance \'longest_first\' or \'only_first\'."
-            << endl;
-        }
-      }
+  vector<size_t> overflowing_token_ids = vector<size_t>();
+  if (num_tokens_to_remove <= 0) {
     (*res)["ids"] = *ids;
     (*res)["pair_ids"] = *pair_ids;
     (*res)["overflowing_token_ids"] = overflowing_token_ids;
+    return;
   }
+
+  size_t window_len;
+  if (truncation_strategy == "longest_first") {
+    for (size_t i = 0; i < num_tokens_to_remove; i++) {
+      if ((pair_ids->size() == 0) || (ids->size() > pair_ids->size())) {
+        if (overflowing_token_ids.size() == 0) {
+          window_len = min(ids->size(), stride + 1);
+        } else {
+          window_len = 1;
+        }
+
+        for (size_t i = ids->size()-1;
+          i > ids->size() - window_len - 1;
+          i--) {
+          overflowing_token_ids.push_back((*ids)[i]);
+        }
+        ids->pop_back();
+      } else {
+        if (overflowing_token_ids.size() == 0) {
+          window_len = min(pair_ids->size(), stride+1);
+        } else {
+          window_len = 1;
+        }
+        for (size_t i = pair_ids->size()-1;
+        i > pair_ids->size() - window_len - 1;
+        i--) {
+          overflowing_token_ids.push_back((*pair_ids)[i]);
+        }
+        pair_ids->pop_back();
+      }
+    }
+    reverse(overflowing_token_ids.begin(), overflowing_token_ids.end());
+  } else if (truncation_strategy == "only_first") {
+    if (ids->size() > num_tokens_to_remove) {
+      window_len = min(ids->size(), stride + num_tokens_to_remove);
+      for (size_t i = ids->size()-1; i > ids->size() - window_len - 1; i--) {
+        overflowing_token_ids.push_back((*ids)[i]);
+      }
+      for (size_t i = 0; i < num_tokens_to_remove; i++) {
+        ids->pop_back();
+      }
+    } else {
+      cerr << "We need to remove {num_tokens_to_remove} "
+        "to truncate the input but the first sequence has a length "
+        << ids->size()
+        << ". Please select another truncation strategy than "
+        << truncation_strategy
+        <<", for instance \'longest_first\' or \'only_second\'."
+        << endl;
+    }
+  } else if (
+    truncation_strategy == "only_second" && pair_ids->size()== 0) {
+      if (pair_ids->size() > num_tokens_to_remove) {
+        window_len = min(pair_ids->size(), stride + num_tokens_to_remove);
+        for (size_t i = pair_ids->size()-1;
+        i > pair_ids->size() - window_len - 1;
+        i--) {
+          overflowing_token_ids.push_back((*pair_ids)[i]);
+        }
+        for (size_t i = 0; i < num_tokens_to_remove; i++) {
+          pair_ids->pop_back();
+        }
+      } else {
+        cerr << "We need to remove " << num_tokens_to_remove
+          << " to truncate the input but the first sequence has a length "
+          << ids->size()
+          << ". Please select another truncation strategy than "
+          << truncation_strategy
+          << ", for instance \'longest_first\' or \'only_first\'."
+          << endl;
+      }
+    }
+  (*res)["ids"] = *ids;
+  (*res)["pair_ids"] = *pair_ids;
+  (*res)["overflowing_token_ids"] = overflowing_token_ids;
+}
 
 
 vector<size_t> BertTokenizer::GetSpecialTokensMask(
@@ -1049,15 +1049,31 @@ int main() {
     return -1;
   }
 
-  string line = "泰晤士河水绿如蓝两岸的建筑物涂染着生机勃发的色彩，"
-    "阳光也绿意葱笼，为一个季节围起了温情的栅栏。只有圣保罗大教堂不"
-    "为任何季节所动，一如故我地穿一身灰色法衣，"
-    "傲岸地站在泰晤士河畔，守望着岁月，它沉郁的钟声，";
+  string line = "泰晤士河水绿如蓝，两岸的建筑物涂染着生机勃发的色彩，"
+  "阳光也绿意葱笼，为一个季节围起了温情的栅栏。"
+  "只有圣保罗大教堂不为任何季节所动，一如故我地穿一身灰色法衣，"
+  "傲岸地站在泰晤士河畔，守望着岁月，它沉郁的钟声，"
+  "只让浪漫的水手和虔诚的拜谒者感动。林徽因和梁思成将从这里开始他们的造访之旅。"
+  "林徽因是旧地重游，丝风片云都感到亲切，"
+  "而梁思成，这里的一切都是陌生的。因着这陌生，"
+  "他才对这座举世闻名的宗教建筑产生了神秘和向往。遵照父亲梁启超的安排，"
+  "他们蜜月后的旅行主要是考察古建筑圣保罗大教堂是他们最先瞩目的第一座圣殿。"
+  "当他们踏上第一个青石台阶的时候，"
+  "仿佛踏进了一阕古老的乐章。那是竖琴与占筝合奏的一支宏伟而悲怆的交响。"
+  "圣保罗大教堂是一座比较成熟的文艺复兴建筑。"
+  "它碟状形高大的弯窿，以及它的两层楹廊，看上去典雅庄重，整个布局完美和谐，"
+  "在这里，中世纪的建筑语言几乎完全消失，"
+  "全部造型生动地反映出文艺复兴建筑文化的特质。这座教堂闻名于世，"
+  "不仅仅因为它是18世纪著名建筑师克里斯托弗-仑的作品，"
+  "更因为这里埋葬着曾经打败拿破仑的威灵顿公爵和战功赫赫的海军大将纳尔逊的遗骨。"
+  "在雕刻着圣保罗旧主生平的山墙下，";
+  string pair = "梁思成问林徽因：“你上看这座教堂，有什么感觉？” ";
   cout << "line " << line.size() << endl;
+  cout << "pair " << pair.size() << endl;
   int idx = 0;
   auto start = std::chrono::system_clock::now();
   while (idx < 10000) {
-    tokenizer_ptr->Encode(line, "只让浪漫的水手和虔诚的拜谒者感动。");
+    tokenizer_ptr->Encode(line, pair);
     idx++;
   }
   auto end   = std::chrono::system_clock::now();

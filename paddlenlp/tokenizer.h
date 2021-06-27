@@ -108,7 +108,7 @@ class BertTokenizer {
       const int num_tokens_to_remove = 0,
       const string&  truncation_strategy = "longest_first",
       const size_t stride = 0) const;
-    void BertTokenizer::TruncateSequence(
+    void TruncateSequence(
       unordered_map<string, vector<size_t>>* res,
       vector<size_t>* ids,
       vector<size_t>* pair_ids,
@@ -132,7 +132,7 @@ class BertTokenizer {
       const string&  truncation_strategy = "longest_first",
       bool return_overflowing_tokens = false,
       bool return_special_tokens_mask = false) const;
-  void BertTokenizer::Encode(
+  void Encode(
     unordered_map<string, vector<size_t>>* output,
     const string& text,
     const string& text_pair = "",
@@ -144,7 +144,7 @@ class BertTokenizer {
     bool return_attention_mask = false,
     const string&  truncation_strategy = "longest_first",
     bool return_overflowing_tokens = false,
-    bool return_special_tokens_mask = false) const {
+    bool return_special_tokens_mask = false) const;
 
 
  private:
