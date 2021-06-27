@@ -14,7 +14,7 @@
 
 #include <utf8proc.h>
 
-#include <set>
+#include <unordered_set>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -24,6 +24,7 @@ using std::string;
 using std::shared_ptr;
 using std::vector;
 using std::unordered_map;
+using std::unordered_set;
 using std::size_t;
 
 
@@ -151,7 +152,7 @@ class BertTokenizer {
     vector<size_t> get_input_ids(
       const string& text) const;
     vector<wstring> all_special_tokens_;
-    std::set<size_t> all_special_token_ids_;
+    unordered_set<size_t> all_special_token_ids_;
     string vocab_file_;
     shared_ptr<Vocab> vocab_;
     InvVocab inv_vocab_;

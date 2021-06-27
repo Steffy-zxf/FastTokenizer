@@ -17,10 +17,10 @@
 #include <iostream>
 #include <fstream>
 #include <numeric>
-#include <set>
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <boost/algorithm/string.hpp>
 
@@ -38,6 +38,7 @@ using std::ifstream;
 using std::min;
 using std::runtime_error;
 using std::unordered_map;
+using std::unorder_set;
 using std::shared_ptr;
 using std::size_t;
 using std::string;
@@ -385,7 +386,7 @@ BertTokenizer::BertTokenizer(
 
     all_special_tokens_ = vector<wstring>(
       {unk_token_, pad_token_, cls_token_, mask_token_, sep_token_});
-    all_special_token_ids_ = std::set<size_t>(
+    all_special_token_ids_ = unordered_set<size_t>(
       {unk_token_id_,
       pad_token_id_,
       cls_token_id_,
