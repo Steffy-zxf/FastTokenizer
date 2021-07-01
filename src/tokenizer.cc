@@ -11,6 +11,11 @@
 
 #include <utf8proc.h>
 
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/complex.h>
+#include <pybind11/functional.h>
+
 #include <algorithm>
 #include <codecvt>
 #include <chrono>
@@ -27,6 +32,7 @@
 #include "paddlenlp/tokenizer.h"
 
 
+
 using std::bad_cast;
 using std::cerr;
 using std::cin;
@@ -38,7 +44,7 @@ using std::ifstream;
 using std::min;
 using std::runtime_error;
 using std::unordered_map;
-using std::unorder_set;
+using std::unordered_set;
 using std::shared_ptr;
 using std::size_t;
 using std::string;
@@ -46,6 +52,7 @@ using std::vector;
 using std::wcout;
 using std::wstring;
 using std::wstring_convert;
+namespace py = pybind11;
 
 
 const wstring kStripChars = L" \t\n\r\v\f";
@@ -684,7 +691,7 @@ vector<size_t> BertTokenizer::GetSpecialTokensMask(
       }
       vector<size_t> res(token_ids_0.size());
       for (size_t i = 0; i < res.size(); i++) {
-        auto&& iter = find(all_special_token_ids_.begin(),
+        auto&& iter = std::find(all_special_token_ids_.begin(),
                         all_special_token_ids_.end(),
                         token_ids_0[i]);
         if (iter != all_special_token_ids_.end()) {
@@ -1028,6 +1035,89 @@ void BertTokenizer::Encode(
     }
     (*output)["position_ids"] = position_ids;
   }
+}
+
+
+PYBIND11_MODULE(TokenizerTest, m) {
+    m.doc() = "BertTokenizer impleted by cpp.";
+
+    py::class_<BertTokenizer>(m , "BertTokenizer")
+      .def(py::init<const string&, bool, const wstring&,
+        const wstring&, const wstring&, const wstring&,
+        const wstring&, const string&>(),
+        "The constructor of BertTokenizer class.",
+        py::arg("vocab_file"),
+        py::arg("do_lower_case") = true,
+        py::arg("unk_token") = L"[UNK]",
+        py::arg("pad_token") = L"[PAD]",
+        py::arg("cls_token") = L"[CLS]",
+        py::arg("mask_token") = L"[MASK]",
+        py::arg("sep_token") = L"[SEP]",
+        py::arg("padding_site") = "right")
+      .def("tokenize", &BertTokenizer::Tokenize,
+        "End-to-end tokenization for BERT models.",
+        py::arg("text"))
+      .def("build_inputs_with_special_tokens",
+        &BertTokenizer::BuildInputsWithSpecialTokens,
+        "Build model inputs from a sequence or a pair of sequence"
+        " for sequence classification tasks by concatenating and"
+        " adding special tokens.",
+        py::arg("token_ids_0"),
+        py::arg("token_ids_1") = vector<size_t>())
+      .def("create_token_type_ids_from_sequences",
+          &BertTokenizer::CreateTokenTypeIdsFromSequences,
+          "Create a mask from the two sequences passed to be used"
+          " in a sequence-pair classification task. ",
+          py::arg("token_ids_0"),
+          py::arg("token_ids_1") = vector<size_t>())
+      .def("convert_tokens_to_string",
+        &BertTokenizer::ConvertTokensToString,
+        "Converts a sequence of tokens (list of string) in a single"
+        " string.",
+        py::arg("token_ids"))
+      .def("convert_tokens_to_ids",
+        &BertTokenizer::ConvertTokensToIds,
+        "Converts a sequence of tokens into ids via vocabulary.",
+        py::arg("tokens"))
+      .def("convert_ids_to_tokens",
+        &BertTokenizer::ConvertIdsToTokens,
+        "Converts a token id or a sequence of token ids to a token or"
+        " a sequence of tokens via vocabulary.",
+        py::arg("token_ids"))
+      .def("truncate_sequence", &BertTokenizer::TruncateSequence,
+        "Truncates a sequence pair in place to the maximum length.",
+        py::arg("ids"),
+        py::arg("pair_ids"),
+        py::arg("num_tokens_to_remove") = 0,
+        py::arg("truncation_strategy") = "longest_first",
+        py::arg("stride") = 0)
+      .def("get_special_tokens_mask",
+        &BertTokenizer::GetSpecialTokensMask,
+        "Retrieves sequence ids from a token list that has no"
+        " special tokens added. This method is called when "
+        " adding special tokens by the tokenizer ``encode`` methods.",
+        py::arg("token_ids_0"),
+        py::arg("token_ids_1") = vector<size_t>(),
+        py::arg("already_has_special_tokens"))
+      .def("get_num_special_tokens_to_add",
+        &BertTokenizer::GetNumSpecialTokensToAdd,
+        "Returns the number of added tokens when encoding a sequence with"
+        " special tokens.",
+        py::arg("pair") = false)
+      .def("encode", &BertTokenizer::Encode,
+        "Performs tokenization and uses the tokenized tokens to prepare model"
+        " inputs.",
+        py::arg("text"),
+        py::arg("text_pair") = "",
+        py::arg("max_seq_len") = -1,
+        py::arg("pad_to_max_seq_len") = false,
+        py::arg("return_length") = false,
+        py::arg("return_token_type_ids") = true,
+        py::arg("return_position_ids") = false,
+        py::arg("return_attention_mask") = false,
+        py::arg("truncation_strategy") = "longest_first",
+        py::arg("return_overflowing_tokens") = false,
+        py::arg("return_special_tokens_mask") = false);
 }
 
 
